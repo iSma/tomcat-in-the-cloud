@@ -1,0 +1,25 @@
+proxy:
+  image: nginx
+  ports:
+    - "8080:80"
+  volumes:
+    - ./proxy/:/etc/nginx/conf.d/
+  links:
+    - server-a
+    - server-b
+    - server-c
+
+server-a:
+  build: ./server
+  volumes:
+    - ./server:/app
+
+server-b:
+  build: ./server
+  volumes:
+    - ./server:/app
+
+server-c:
+  build: ./server
+  volumes:
+    - ./server:/app
