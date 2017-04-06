@@ -1,8 +1,23 @@
 package org.example.tomcat.test;
 
 import org.apache.catalina.Context;
+import org.apache.catalina.ha.session.ClusterSessionListener;
+import org.apache.catalina.ha.session.DeltaManager;
+import org.apache.catalina.ha.session.JvmRouteBinderValve;
+import org.apache.catalina.ha.tcp.ReplicationValve;
+import org.apache.catalina.ha.tcp.SimpleTcpCluster;
+import org.apache.catalina.startup.Tomcat;
+import org.apache.catalina.tribes.group.GroupChannel;
+import org.apache.catalina.tribes.group.interceptors.StaticMembershipInterceptor;
+import org.apache.catalina.tribes.group.interceptors.TcpFailureDetector;
+import org.apache.catalina.tribes.group.interceptors.TcpPingInterceptor;
+import org.apache.catalina.tribes.membership.StaticMember;
+import org.apache.catalina.tribes.transport.ReplicationTransmitter;
+import org.apache.catalina.tribes.transport.nio.NioReceiver;
+import org.apache.catalina.tribes.transport.nio.PooledParallelSender;
 import org.springframework.boot.context.embedded.EmbeddedServletContainerFactory;
 import org.springframework.boot.context.embedded.tomcat.TomcatContextCustomizer;
+import org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainer;
 import org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,8 +28,8 @@ public class TomcatConfiguration {
 
     @Bean
     public EmbeddedServletContainerFactory servletContainerFactory() {
-        TomcatEmbeddedServletContainerFactory factory = new TomcatEmbeddedServletContainerFactory();
-        /*
+       // TomcatEmbeddedServletContainerFactory factory = new TomcatEmbeddedServletContainerFactory();
+
         TomcatEmbeddedServletContainerFactory factory = new TomcatEmbeddedServletContainerFactory() {
             @Override
             protected TomcatEmbeddedServletContainer getTomcatEmbeddedServletContainer(Tomcat tomcat) {
@@ -56,7 +71,7 @@ public class TomcatConfiguration {
                 return super.getTomcatEmbeddedServletContainer(tomcat);
             }
         };
-        */
+
 
         factory.addContextCustomizers(new ContextCustomizer());
         return factory;
