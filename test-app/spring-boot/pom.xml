@@ -24,13 +24,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/org.apache.tomcat/tomcat-catalina -->
+        <!-- https://mvnrepository.com/artifact/org.apache.tomcat/tomcat-catalina-ha -->
         <dependency>
             <groupId>org.apache.tomcat</groupId>
-            <artifactId>tomcat-catalina</artifactId>
-            <version>8.0.42</version>
+            <artifactId>tomcat-catalina-ha</artifactId>
+            <version>8.5.12</version>
         </dependency>
-
     </dependencies>
 
     <build>
