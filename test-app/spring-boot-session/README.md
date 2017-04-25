@@ -1,4 +1,4 @@
-# Session Replication Test APP (with Spring Boot)
+# Session Replication Test APP (with Spring Boot and Spring Session)
 
 ## Usage
 
