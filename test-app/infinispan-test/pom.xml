@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.exampl</groupId>
+    <artifactId>infinispan-test</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <mainClass>org.example.infinispan.Main</mainClass>
+        <tomcat.version>8.5.12</tomcat.version>
+        <infinispan.version>9.0.0.Final</infinispan.version>
+        <kubernetes-ping.version>0.9.2</kubernetes-ping.version>
+
+
+        <!-- Docker & Fabric8 Configs -->
+        <docker.env.Main>${mainClass}</docker.env.Main>
+        <docker.port.container.http>8080</docker.port.container.http>
+
+        <!-- OpenShift service customization -->
+        <fabric8.service.name>${project.artifactId}</fabric8.service.name>
+        <fabric8.service.port>8080</fabric8.service.port>
+        <fabric8.service.containerPort>8080</fabric8.service.containerPort>
+        <fabric8.service.type>LoadBalancer</fabric8.service.type>
+
+        <!-- Readiness Probe -->
+        <!--
+        <fabric8.readinessProbe.httpGet.path>/api/health</fabric8.readinessProbe.httpGet.path>
+        <fabric8.readinessProbe.httpGet.port>8080</fabric8.readinessProbe.httpGet.port>
+        <fabric8.readinessProbe.initialDelaySeconds>5</fabric8.readinessProbe.initialDelaySeconds>
+        <fabric8.readinessProbe.timeoutSeconds>30</fabric8.readinessProbe.timeoutSeconds>
+         -->
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>${tomcat.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.infinispan</groupId>
+            <artifactId>infinispan-embedded</artifactId>
+            <version>${infinispan.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jgroups.kubernetes</groupId>
+            <artifactId>kubernetes</artifactId>
+            <version>${kubernetes-ping.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifest>
+                            <mainClass>${mainClass}</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>hawt-app-maven-plugin</artifactId>
+                <version>2.2.101</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                        </goals>
+                        <phase>package</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <javaMainClass>${mainClass}</javaMainClass>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>fabric8-maven-plugin</artifactId>
+                <version>3.3.4</version>
+
+                <configuration>
+                    <images>
+                        <image>
+                            <name>${project.artifactId}:${project.version}</name>
+                            <build>
+                                <from>fabric8/s2i-java</from>
+                            </build>
+                        </image>
+                    </images>
+                </configuration>
+
+                <executions>
+                    <execution>
+                        <id>fmp</id>
+                    </execution>
+                </executions>
+
+            </plugin>
+
+        </plugins>
+    </build>
+</project>
