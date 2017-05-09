@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.exampl</groupId>
+    <groupId>org.example</groupId>
     <artifactId>infinispan-test</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -16,15 +16,12 @@
         <kubernetes-ping.version>0.9.2</kubernetes-ping.version>
 
 
-        <!-- Docker & Fabric8 Configs -->
+        <!-- Docker & Fabric8 Configs
         <docker.env.Main>${mainClass}</docker.env.Main>
         <docker.port.container.http>8080</docker.port.container.http>
-
+ -->
         <!-- OpenShift service customization -->
-        <fabric8.service.name>${project.artifactId}</fabric8.service.name>
-        <fabric8.service.port>8080</fabric8.service.port>
-        <fabric8.service.containerPort>8080</fabric8.service.containerPort>
-        <fabric8.service.type>LoadBalancer</fabric8.service.type>
+        <fabric8.namespace>fabric8</fabric8.namespace>
 
         <!-- Readiness Probe -->
         <!--
@@ -80,7 +77,8 @@
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                <transformer
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>org.example.infinispan.Main</mainClass>
                                 </transformer>
                             </transformers>
@@ -101,6 +99,39 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <generator>
+                        <includes>
+                            <include>java-exec</include>
+                        </includes>
+                        <config>
+                            <java-exec>
+                                <jolokiaPort>0</jolokiaPort>
+                                <prometheusPort>0</prometheusPort>
+                                <webPort>8080</webPort>
+                            </java-exec>
+                        </config>
+                    </generator>
+
+                    <resources>
+                        <env>
+                            <OPENSHIFT_KUBE_PING_NAMESPACE>${fabric8.namespace}</OPENSHIFT_KUBE_PING_NAMESPACE>
+                        </env>
+                            <ports>
+                            <!-- KUBE_PING requires exposing ping port -->
+                            <port>8888</port>
+                        </ports>
+                    </resources>
+
+                    <enricher>
+                        <config>
+                            <fmp-service>
+                                <name>${project.artifactId}</name>
+                                <port>8080</port>
+                            </fmp-service>
+                        </config>
+                    </enricher>
+                </configuration>
             </plugin>
 
         </plugins>

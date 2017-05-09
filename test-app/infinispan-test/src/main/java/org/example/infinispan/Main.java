@@ -26,10 +26,13 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
     public static Cache<String, Integer> cache;
+    public static String SERVER;
 
     public static void main(String[] args) throws LifecycleException, IOException {
         Tomcat tomcat = new Tomcat();
         tomcat.setPort(8080);
+
+        SERVER = InetAddress.getLocalHost().getHostAddress();
 
         File base = new File(System.getProperty("java.io.tmpdir"));
         Context ctx = tomcat.addContext("", base.getAbsolutePath());
@@ -49,13 +52,9 @@ public class Main {
         cache = cacheManager.getCache();
         cache.addListener(new MyListener());
 
-        Cache<String, String> cache2 = cacheManager.getCache("cache2");
-        cache2.addListener(new MyListener());
-
-        String server = InetAddress.getLocalHost().getHostAddress();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
-        scheduler.scheduleAtFixedRate(() -> cache2.put(server, Instant.now().toString()),
+        scheduler.scheduleAtFixedRate(() -> cache.put(SERVER, 666),
                 0, 2, TimeUnit.SECONDS);
 
         tomcat.start();
@@ -71,13 +70,13 @@ public class Main {
         @CacheEntryCreated
         public void entryCreated(CacheEntryCreatedEvent<String, Object> event) {
             if (!event.isPre())
-                System.out.println("Created new entry: " + event.getKey() + " " + event.getValue());
+                System.out.println("[NEW] <" + SERVER + "> " + event.getKey() + "=" + event.getValue());
         }
 
         @CacheEntryModified
         public void entryModified(CacheEntryModifiedEvent<String, Object> event) {
             if (!event.isPre())
-                System.out.println("Updated entry: " + event.getKey() + " " + event.getValue());
+                System.out.println("[UPD] <" + SERVER + "> " + event.getKey() + "=" + event.getValue());
         }
     }
 }
