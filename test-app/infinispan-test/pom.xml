@@ -49,6 +49,12 @@
             <groupId>org.jgroups.kubernetes</groupId>
             <artifactId>kubernetes</artifactId>
             <version>${kubernetes-ping.version}</version>
+            <exclusions>
+                <exclusion>
+                    <artifactId>undertow-core</artifactId>
+                    <groupId>io.undertow</groupId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -117,10 +123,6 @@
                         <env>
                             <OPENSHIFT_KUBE_PING_NAMESPACE>${fabric8.namespace}</OPENSHIFT_KUBE_PING_NAMESPACE>
                         </env>
-                            <ports>
-                            <!-- KUBE_PING requires exposing ping port -->
-                            <port>8888</port>
-                        </ports>
                     </resources>
 
                     <enricher>

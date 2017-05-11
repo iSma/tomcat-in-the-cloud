@@ -1,0 +1,13 @@
+metadata:
+  annotations:
+configmap.fabric8.io/update-on-change: ${project.artifactId}
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - env :
+        ports:
+          - name: kubeping
+            containerPort: 8888
+            protocol: TCP
