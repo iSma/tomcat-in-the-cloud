@@ -1,6 +1,3 @@
-metadata:
-  annotations:
-configmap.fabric8.io/update-on-change: ${project.artifactId}
 spec:
   replicas: 2
   template:
