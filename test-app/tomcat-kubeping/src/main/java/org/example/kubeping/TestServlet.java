@@ -14,7 +14,7 @@ public class TestServlet extends HttpServlet {
             "  \"counter\": %d,\n" +
             "  \"id\": \"%s\",\n" +
             "  \"new\": %s,\n" +
-            "  \"server\": \"%s\",\n" +
+            "  \"server\": \"%s\"\n" +
             "}";
 
     @Override
