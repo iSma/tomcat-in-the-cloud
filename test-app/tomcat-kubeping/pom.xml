@@ -12,7 +12,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mainClass>org.example.kubeping.Main</mainClass>
-        <tomcat.version>8.5.12</tomcat.version>
+        <tomcat.version>8.5.15</tomcat.version>
 
         <!-- OpenShift service customization -->
         <fabric8.namespace>tomcat-kubeping</fabric8.namespace>
@@ -30,6 +30,11 @@
         <dependency>
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
+            <version>${tomcat.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat</groupId>
+            <artifactId>tomcat-catalina-ha</artifactId>
             <version>${tomcat.version}</version>
         </dependency>
     </dependencies>
