@@ -1,11 +1,15 @@
-# Infnispan and Kubeping test
+# Tomcat and KubePing test
 
 ## Usage
 
-log into the openshift console and be in an openshift project called "fabric8"
+Log into the OpenShift console and switch to this app's project
+(by default: `tomcat-kubeping`, can be customized thorugh `fabric8.namespace` in `pom.xml`).
 
-Add a service account for Kube Ping
+Add a service account for KubePing:
 
-    oc policy add-role-to-user view system:serviceaccount:$(oc project -q):default -n $(oc project -q)
+```sh
+oc policy add-role-to-user view system:serviceaccount:$(oc project -q):default -n $(oc project -q)
+```
 
-Run `mvn fabric8:deploy` to generate docker image and deploy it on openshift, it deploys automatically 2 pods
+Run `mvn fabric8:deploy` to generate the Docker image and deploy it on OpenShift.
+By default, 2 pods are deployed. This can be changed in `src/main/fabric8/deployment.yml`.
