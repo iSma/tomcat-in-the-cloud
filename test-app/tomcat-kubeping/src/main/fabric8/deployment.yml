@@ -1,0 +1,10 @@
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - env :
+        ports:
+          - name: kubeping
+            containerPort: 8888
+            protocol: TCP
