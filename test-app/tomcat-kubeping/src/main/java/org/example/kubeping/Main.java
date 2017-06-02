@@ -8,6 +8,7 @@ import org.apache.catalina.tribes.group.GroupChannel;
 import org.apache.catalina.tribes.group.interceptors.MessageDispatchInterceptor;
 import org.apache.catalina.tribes.group.interceptors.TcpFailureDetector;
 import org.apache.catalina.tribes.group.interceptors.TcpPingInterceptor;
+import org.apache.catalina.tribes.membership.McastService;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,17 +29,12 @@ public class Main {
         ctx.setName("{CTX}");
         ctx.setDistributable(true);
 
-        // Start Replication receiver and transmitter
-        // Don't start Membership receiver and transmitter (MBR_{RX,TX}_SEQ)
-        //cluster.setChannelStartOptions(Channel.SND_RX_SEQ | Channel.SND_TX_SEQ);
-
         GroupChannel channel = (GroupChannel) cluster.getChannel();
         channel.setMembershipService(new KubeshipService());
 
         channel.addInterceptor(new TcpPingInterceptor());
         channel.addInterceptor(new TcpFailureDetector());
         channel.addInterceptor(new MessageDispatchInterceptor());
-
 
         tomcat.start();
         tomcat.getServer().await();

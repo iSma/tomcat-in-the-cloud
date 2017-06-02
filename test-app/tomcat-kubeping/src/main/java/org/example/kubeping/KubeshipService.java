@@ -2,6 +2,7 @@ package org.example.kubeping;
 
 import org.apache.catalina.tribes.*;
 import org.apache.catalina.tribes.membership.McastService;
+import org.apache.catalina.tribes.membership.MemberImpl;
 import org.apache.catalina.tribes.membership.Membership;
 import org.apache.catalina.tribes.membership.StaticMember;
 import org.apache.catalina.tribes.util.UUIDGenerator;
@@ -18,7 +19,7 @@ import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Properties;
 
-public class KubeshipService implements MembershipService, MembershipListener {
+public class KubeshipService implements MembershipService, MembershipListener, MessageListener {
     private static final Log log = LogFactory.getLog(McastService.class);
 
     private Properties properties = new Properties();
@@ -26,6 +27,7 @@ public class KubeshipService implements MembershipService, MembershipListener {
     private StaticMember localMember;
     private Membership membership;
     private MembershipListener listener;
+    private MessageListener messageListener;
 
     private byte[] payload;
     private byte[] domain;
@@ -53,14 +55,9 @@ public class KubeshipService implements MembershipService, MembershipListener {
 
     @Override
     public void start(int level) throws Exception {
-        // TODO
+        // TODO: check level (only start for MBR_TX or MBR_TX), don't start twice
 
         log.info("start(" + level + ")");
-
-//        if ( impl != null ) {
-//            impl.start(level);
-//            return;
-//        }
 
         String host = properties.getProperty("tcpListenHost");
         int port = Integer.parseInt(properties.getProperty("tcpListenPort"));
@@ -78,7 +75,25 @@ public class KubeshipService implements MembershipService, MembershipListener {
         else
             membership.reset();
 
-        //impl.start(level);
+        // TODO: remove
+        // Static members for testing
+        for (int i = 2; i <= 4; i++) {
+            MemberImpl m;
+            log.info("Add member i = " + i);
+            if (localMember.getHost()[3] == i) {
+                log.info("Is local");
+                m = localMember;
+            } else {
+                log.info("Is not local");
+                m = new MemberImpl("172.17.0." + i, 4000, 0);
+                m.setUniqueId(UUIDGenerator.randomUUID(true));
+            }
+
+            membership.addMember(m);
+            memberAdded(m);
+        }
+
+        // TODO: start RefreshThread
     }
 
     @Override
@@ -182,8 +197,17 @@ public class KubeshipService implements MembershipService, MembershipListener {
         log.info("removeMembershipListener");
     }
 
+    public void setMessageListener(MessageListener listener) {
+        this.messageListener = listener;
+    }
+
+    public void removeMessageListener() {
+        this.messageListener = null;
+    }
+
     @Override
     public void setPayload(byte[] payload) {
+        // TODO: what does this method do?
         log.info("setPayload: " + Arrays.toString(payload));
         this.payload = payload;
         if (localMember != null) {
@@ -194,6 +218,7 @@ public class KubeshipService implements MembershipService, MembershipListener {
 
     @Override
     public void setDomain(byte[] domain) {
+        // TODO: what does this method do?
         log.info("setDomain: " + Arrays.toString(domain));
         this.domain = domain;
         if (localMember != null) {
@@ -204,7 +229,7 @@ public class KubeshipService implements MembershipService, MembershipListener {
 
     @Override
     public void broadcast(ChannelMessage message) throws ChannelException {
-        // TODO
+        // TODO: what does this method do?
         log.info("broadcast: " + message);
     }
 
@@ -232,6 +257,18 @@ public class KubeshipService implements MembershipService, MembershipListener {
         log.info("memberDisappeared: " + member);
         if (listener != null)
             listener.memberDisappeared(member);
+    }
+
+    @Override
+    public void messageReceived(ChannelMessage msg) {
+        log.info("messageReceived: " + msg);
+        if (messageListener != null && messageListener.accept(msg))
+            messageListener.messageReceived(msg);
+    }
+
+    @Override
+    public boolean accept(ChannelMessage msg) {
+        return false;
     }
 
     public static class RefreshThread extends Thread {
