@@ -13,6 +13,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <mainClass>org.example.kubeping.Main</mainClass>
         <tomcat.version>8.5.15</tomcat.version>
+        <json.version>20170516</json.version>
 
         <!-- OpenShift service customization -->
         <fabric8.namespace>tomcat-kubeping</fabric8.namespace>
@@ -36,6 +37,11 @@
             <groupId>org.apache.tomcat</groupId>
             <artifactId>tomcat-catalina-ha</artifactId>
             <version>${tomcat.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>${json.version}</version>
         </dependency>
     </dependencies>
 
