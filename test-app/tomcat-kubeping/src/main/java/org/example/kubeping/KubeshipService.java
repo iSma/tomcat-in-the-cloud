@@ -14,6 +14,7 @@ import org.json.JSONTokener;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.security.AccessController;
@@ -266,13 +267,12 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         private static final String ENV_PREFIX = "OPENSHIFT_KUBE_PING_";
 
         private String url;
-        private String labels;
         private StreamProvider streamProvider;
 
         RefreshThread() throws Exception {
             super();
             String namespace = getEnv(ENV_PREFIX + "NAMESPACE");
-            if (namespace == null) {
+            if (namespace == null || namespace.length() == 0) {
                 log.error("Namespace not set; clustering disabled");
                 return;
             }
@@ -311,7 +311,6 @@ public class KubeshipService implements MembershipService, MembershipListener, M
 
                 host = getEnv(ENV_PREFIX + "MASTER_HOST", "KUBERNETES_SERVICE_HOST");
                 port = getEnv(ENV_PREFIX + "MASTER_PORT", "KUBERNETES_SERVICE_PORT");
-
                 String saTokenFile = getEnv(ENV_PREFIX + "SA_TOKEN_FILE");
                 if (saTokenFile == null)
                     saTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
@@ -329,7 +328,15 @@ public class KubeshipService implements MembershipService, MembershipListener, M
             if (ver == null)
                 ver = "v1";
 
-            url = String.format("%s://%s:%s/api/%s", protocol, host, port, ver);
+            String labels = getEnv(ENV_PREFIX + "LABELS");
+
+            url = String.format("%s://%s:%s/api/%s/namespaces/%s/pods",
+                    protocol, host, port, ver,
+                    URLEncoder.encode(labels, "UTF-8"));
+
+            if (labels != null && labels.length() > 0)
+                url = url + "?labelSelector=" + URLEncoder.encode(labels, "UTF-8");
+
             labels = getEnv(ENV_PREFIX + "LABELS");
         }
 
@@ -353,11 +360,11 @@ public class KubeshipService implements MembershipService, MembershipListener, M
             while (doRunRefreshThread) {
                 log.info("Refresh pod list");
 
-                String podsUrl = String.format("%s/pods", url);
+                log.info("URL = " + url);
                 JSONObject json = null;
                 try {
                     // TODO: extract timeout values to KubeshipService.properties
-                    InputStream stream = streamProvider.openStream(podsUrl, headers, 1000, 1000);
+                    InputStream stream = streamProvider.openStream(url, headers, 1000, 1000);
                     json = new JSONObject(new JSONTokener(stream));
                 } catch (IOException e) {
                     // TODO
