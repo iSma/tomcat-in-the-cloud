@@ -8,6 +8,7 @@ import org.apache.catalina.tribes.membership.StaticMember;
 import org.apache.catalina.tribes.util.UUIDGenerator;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -28,6 +29,8 @@ public class KubeshipService implements MembershipService, MembershipListener, M
     private Membership membership;
     private MembershipListener listener;
     private MessageListener messageListener;
+
+    private RefreshThread refreshThread;
 
     private byte[] payload;
     private byte[] domain;
@@ -75,25 +78,10 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         else
             membership.reset();
 
-        // TODO: remove
-        // Static members for testing
-        for (int i = 2; i <= 4; i++) {
-            MemberImpl m;
-            log.info("Add member i = " + i);
-            if (localMember.getHost()[3] == i) {
-                log.info("Is local");
-                m = localMember;
-            } else {
-                log.info("Is not local");
-                m = new MemberImpl("172.17.0." + i, 4000, 0);
-                m.setUniqueId(UUIDGenerator.randomUUID(true));
-            }
-
-            membership.addMember(m);
-            memberAdded(m);
+        if (refreshThread == null) {
+            refreshThread = new RefreshThread();
+            refreshThread.start();
         }
-
-        // TODO: start RefreshThread
     }
 
     @Override
@@ -274,27 +262,85 @@ public class KubeshipService implements MembershipService, MembershipListener, M
     public static class RefreshThread extends Thread {
         private static final String ENV_PREFIX = "OPENSHIFT_KUBE_PING_";
 
+        private String url;
+        private String labels;
+
         RefreshThread() {
             super();
-            String protocol = getEnv("MASTER_PROTOCOL", "https");
-            String host = getEnv("MASTER_HOST");
-            String port = getEnv("MASTER_PORT");
+            String namespace = getEnv(ENV_PREFIX + "NAMESPACE");
+            if (namespace == null) {
+                log.error("Namespace not set; clustering disabled");
+                return;
+            }
 
-            String ver = getEnv("API_VERSION", "v1");
-            String url = String.format("%s://%s:%s/api/%s", protocol, host, port, ver);
+            log.info(String.format("Namespace [%s] set; clustering enabled", namespace));
+
+            String protocol = getEnv(ENV_PREFIX + "MASTER_PROTOCOL");
+            String host;
+            String port;
+
+            String certFile = getEnv(ENV_PREFIX + "CLIENT_CERT_FILE", "KUBERNETES_CLIENT_CERTIFICATE_FILE");
+
+            if (certFile != null) {
+                if (protocol == null)
+                    protocol = "http";
+
+                host = getEnv(ENV_PREFIX + "MASTER_HOST", "KUBERNETES_RO_SERVICE_HOST");
+                port = getEnv(ENV_PREFIX + "MASTER_PORT", "KUBERNETES_RO_SERVICE_PORT");
+
+                String keyFile = getEnv(ENV_PREFIX + "CLIENT_KEY_FILE", "KUBERNETES_CLIENT_KEY_FILE");
+                String keyPassword = getEnv(ENV_PREFIX + "CLIENT_KEY_PASSWORD", "KUBERNETES_CLIENT_KEY_PASSWORD");
+
+                String keyAlgo = getEnv(ENV_PREFIX + "CLIENT_KEY_ALGO", "KUBERNETES_CLIENT_KEY_ALGO");
+                if (keyAlgo == null)
+                    keyAlgo = "RSA";
+
+                String caCertFile = getEnv(ENV_PREFIX + "CA_CERT_FILE", "KUBERNETES_CA_CERTIFICATE_FILE");
+                if (caCertFile == null)
+                    caCertFile =  "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+
+                // TODO
+                // streamProvider = new CertificateStreamProvider(certFile, keyFile, keyPassword, keyAlgo, caCertFile);
+            } else {
+                if (protocol == null)
+                    protocol = "https";
+
+                host = getEnv(ENV_PREFIX + "MASTER_HOST", "KUBERNETES_SERVICE_HOST");
+                port = getEnv(ENV_PREFIX + "MASTER_PORT", "KUBERNETES_SERVICE_PORT");
+
+                String saTokenFile = getEnv(ENV_PREFIX + "SA_TOKEN_FILE");
+                if (saTokenFile == null)
+                    saTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+
+                String caCertFile = getEnv(ENV_PREFIX + "CA_CERT_FILE", "KUBERNETES_CA_CERTIFICATE_FILE");
+                if (caCertFile == null)
+                    caCertFile =  "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+
+                // TODO
+                //streamProvider = new TokenStreamProvider(saToken, caCertFile);
+            }
+
+            String ver = getEnv(ENV_PREFIX + "API_VERSION");
+            if (ver == null)
+                ver = "v1";
+
+            url = String.format("%s://%s:%s/api/%s", protocol, host, port, ver);
+            labels = getEnv(ENV_PREFIX + "LABELS");
         }
 
-        private static String getEnv(String suffix, String def) {
-            String key = ENV_PREFIX + suffix;
-            String val = AccessController.doPrivileged((PrivilegedAction<String>) () -> System.getenv(key));
-            return val == null ? def : val;
+        private static String getEnv(String... keys) {
+            String val = null;
+
+            for (String key : keys) {
+                val = AccessController.doPrivileged((PrivilegedAction<String>) () -> System.getenv(key));
+                if (val != null)
+                    break;
+            }
+
+            return val;
         }
 
-        private static String getEnv(String suffix) {
-            return getEnv(suffix, null);
-        }
-
-        public static JSONObject request(String url) throws IOException {
+        private static JSONObject request(String url) throws IOException {
             JSONObject json = null;
             HttpURLConnection conn = null;
 
@@ -320,12 +366,42 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         public void run() {
             boolean doRunRefreshThread = true;
             while (doRunRefreshThread) {
-                /*
-                TODO
-                - construct URL
-                - make request
-                - get desired info from JSON
-                 */
+                log.info("Refresh pod list");
+
+                String podsUrl = String.format("%s/pods", url);
+                JSONObject json = null;
+                try {
+                    json = request(podsUrl);
+                } catch (IOException e) {
+                    // TODO
+                    e.printStackTrace();
+                    return;
+                }
+
+                JSONArray items = json.getJSONArray("items");
+
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject item = items.getJSONObject(i);
+                    JSONObject status = item.getJSONObject("status");
+
+                    if (status.getString("phase").equals("Running")) {
+                        /* TODO:
+                        - get status.podIP
+                        - get metadata.uid
+                        - transform uid to UniqueId
+                        - compare id with existing members
+                        - call memberAdded for new member
+                        - call memberDisappeared for members not in pod list
+                         */
+
+                        String ip = status.getString("podIP");
+                        log.info("Pod found: " + ip);
+                    }
+                }
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ignore) { }
             }
         }
     }
