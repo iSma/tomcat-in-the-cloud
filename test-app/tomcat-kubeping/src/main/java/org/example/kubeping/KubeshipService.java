@@ -6,20 +6,20 @@ import org.apache.catalina.tribes.membership.StaticMember;
 import org.apache.catalina.tribes.util.UUIDGenerator;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
+import org.example.kubeping.stream.StreamProvider;
+import org.example.kubeping.stream.TokenStreamProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import javax.net.ssl.*;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-import java.net.URLConnection;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -315,14 +315,14 @@ public class KubeshipService implements MembershipService, MembershipListener, M
                 String saTokenFile = getEnv(ENV_PREFIX + "SA_TOKEN_FILE");
                 if (saTokenFile == null)
                     saTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+                byte[] bytes = Files.readAllBytes(FileSystems.getDefault().getPath(saTokenFile));
+                String saToken = new String(bytes);
 
                 String caCertFile = getEnv(ENV_PREFIX + "CA_CERT_FILE", "KUBERNETES_CA_CERTIFICATE_FILE");
                 if (caCertFile == null)
                     caCertFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
-                // TODO
-                //streamProvider = new TokenStreamProvider(saToken, caCertFile);
-                streamProvider = new StreamProvider();
+                streamProvider = new TokenStreamProvider(saToken, caCertFile);
             }
 
             String ver = getEnv(ENV_PREFIX + "API_VERSION");
@@ -348,13 +348,16 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         @Override
         public void run() {
             boolean doRunRefreshThread = true;
+            Map<String, String> headers = new HashMap<>();
+
             while (doRunRefreshThread) {
                 log.info("Refresh pod list");
 
                 String podsUrl = String.format("%s/pods", url);
                 JSONObject json = null;
                 try {
-                    InputStream stream = streamProvider.openStream(url, null, 1000, 1000);
+                    // TODO: extract timeout values to KubeshipService.properties
+                    InputStream stream = streamProvider.openStream(podsUrl, headers, 1000, 1000);
                     json = new JSONObject(new JSONTokener(stream));
                 } catch (IOException e) {
                     // TODO
@@ -384,74 +387,11 @@ public class KubeshipService implements MembershipService, MembershipListener, M
                 }
 
                 try {
+                    // TODO: extract sleep time to KubeshipService.properties
                     Thread.sleep(5000);
                 } catch (InterruptedException ignore) {
                 }
             }
-        }
-    }
-
-    private static class StreamProvider {
-        public static final TrustManager[] INSECURE_TRUST_MANAGERS = new TrustManager[]{
-                new X509TrustManager() {
-                    @Override
-                    public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                    }
-
-                    @Override
-                    public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-                    }
-
-                    @Override
-                    public X509Certificate[] getAcceptedIssuers() {
-                        return null;
-                    }
-                }
-        };
-        static final HostnameVerifier INSECURE_HOSTNAME_VERIFIER = new HostnameVerifier() {
-            @Override
-            public boolean verify(String arg0, SSLSession arg1) {
-                return true;
-            }
-        };
-        private static final Log log = LogFactory.getLog(StreamProvider.class);
-        private final SSLSocketFactory factory;
-
-        public StreamProvider() throws Exception {
-            SSLContext context = SSLContext.getInstance("TLS");
-            context.init(null, INSECURE_TRUST_MANAGERS, null);
-            factory = context.getSocketFactory();
-        }
-
-        public InputStream openStream(String url, Map<String, String> headers, int connectTimeout, int readTimeout) throws IOException {
-            URLConnection connection = openConnection(url, headers, connectTimeout, readTimeout);
-            if (connection instanceof HttpsURLConnection) {
-                HttpsURLConnection httpsConnection = HttpsURLConnection.class.cast(connection);
-                httpsConnection.setHostnameVerifier(INSECURE_HOSTNAME_VERIFIER);
-                httpsConnection.setSSLSocketFactory(factory);
-                log.debug(String.format("Using HttpsURLConnection with SSLSocketFactory [%s] for url [%s].", factory, url));
-            } else {
-                log.debug(String.format("Using URLConnection for url [%s].", url));
-            }
-
-            return connection.getInputStream();
-        }
-
-        public URLConnection openConnection(String url, Map<String, String> headers, int connectTimeout, int readTimeout) throws IOException {
-            log.debug(String.format("%s opening connection: url [%s], headers [%s], connectTimeout [%s], readTimeout [%s]", getClass().getSimpleName(), url, headers, connectTimeout, readTimeout));
-            URLConnection connection = new URL(url).openConnection();
-            if (headers != null) {
-                for (Map.Entry<String, String> entry : headers.entrySet()) {
-                    connection.addRequestProperty(entry.getKey(), entry.getValue());
-                }
-            }
-            if (connectTimeout < 0 || readTimeout < 0) {
-                throw new IllegalArgumentException(
-                        String.format("Neither connectTimeout [%s] nor readTimeout [%s] can be less than 0 for URLConnection.", connectTimeout, readTimeout));
-            }
-            connection.setConnectTimeout(connectTimeout);
-            connection.setReadTimeout(readTimeout);
-            return connection;
         }
     }
 }
