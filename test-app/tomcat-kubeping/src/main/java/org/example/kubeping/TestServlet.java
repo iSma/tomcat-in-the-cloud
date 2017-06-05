@@ -15,6 +15,7 @@ public class TestServlet extends HttpServlet {
             "  \"id\": \"%s\",\n" +
             "  \"new\": %s,\n" +
             "  \"server\": \"%s\"\n" +
+            "  \"hostname\": \"%s\"\n" +
             "}";
 
     @Override
@@ -32,9 +33,10 @@ public class TestServlet extends HttpServlet {
         String id = session.getId();
         String isNew = session.isNew() ? "true" : "false";
         String server = InetAddress.getLocalHost().getHostAddress();
+        String hostname = InetAddress.getLocalHost().getHostName();
 
         try {
-            out.println(String.format(TEMPLATE, counter, id, isNew, server));
+            out.println(String.format(TEMPLATE, counter, id, isNew, server, hostname));
         } finally {
             out.close();
         }

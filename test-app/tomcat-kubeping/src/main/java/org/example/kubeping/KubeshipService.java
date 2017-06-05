@@ -1,6 +1,7 @@
 package org.example.kubeping;
 
 import org.apache.catalina.tribes.*;
+import org.apache.catalina.tribes.membership.MemberImpl;
 import org.apache.catalina.tribes.membership.Membership;
 import org.apache.catalina.tribes.membership.StaticMember;
 import org.apache.catalina.tribes.util.UUIDGenerator;
@@ -19,10 +20,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 public class KubeshipService implements MembershipService, MembershipListener, MessageListener {
     private static final Log log = LogFactory.getLog(KubeshipService.class);
@@ -57,7 +55,6 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         log.info("START");
         start(MembershipService.MBR_RX);
         start(MembershipService.MBR_TX);
-
     }
 
     @Override
@@ -96,7 +93,6 @@ public class KubeshipService implements MembershipService, MembershipListener, M
 
     @Override
     public boolean hasMembers() {
-        log.info("hasMembers()");
         return membership != null && membership.hasMembers();
     }
 
@@ -110,7 +106,6 @@ public class KubeshipService implements MembershipService, MembershipListener, M
 
     @Override
     public Member[] getMembers() {
-        log.info("getMembers()");
         if (membership == null)
             return new Member[0];
         return membership.getMembers();
@@ -227,7 +222,6 @@ public class KubeshipService implements MembershipService, MembershipListener, M
 
     @Override
     public Channel getChannel() {
-        log.info("getChannel()");
         return this.channel;
     }
 
@@ -263,19 +257,28 @@ public class KubeshipService implements MembershipService, MembershipListener, M
         return false;
     }
 
-    public static class RefreshThread extends Thread {
+    public class RefreshThread extends Thread {
         private static final String ENV_PREFIX = "OPENSHIFT_KUBE_PING_";
 
         private String url;
         private StreamProvider streamProvider;
+        private boolean running;
 
-        RefreshThread() throws Exception {
+        RefreshThread() {
             super();
-            String namespace = getEnv(ENV_PREFIX + "NAMESPACE");
-            if (namespace == null || namespace.length() == 0) {
-                log.error("Namespace not set; clustering disabled");
-                return;
+            try {
+                init();
+                running = true;
+            } catch (IOException e) {
+                e.printStackTrace();
+                running = false;
             }
+        }
+
+        private void init() throws IOException {
+            String namespace = getEnv(ENV_PREFIX + "NAMESPACE");
+            if (namespace == null || namespace.length() == 0)
+                throw new RuntimeException("Namespace not set; clustering disabled");
 
             log.info(String.format("Namespace [%s] set; clustering enabled", namespace));
 
@@ -314,7 +317,10 @@ public class KubeshipService implements MembershipService, MembershipListener, M
                 String saTokenFile = getEnv(ENV_PREFIX + "SA_TOKEN_FILE");
                 if (saTokenFile == null)
                     saTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token";
-                byte[] bytes = Files.readAllBytes(FileSystems.getDefault().getPath(saTokenFile));
+
+                byte[] bytes = new byte[0];
+                bytes = Files.readAllBytes(FileSystems.getDefault().getPath(saTokenFile));
+
                 String saToken = new String(bytes);
 
                 String caCertFile = getEnv(ENV_PREFIX + "CA_CERT_FILE", "KUBERNETES_CA_CERTIFICATE_FILE");
@@ -330,17 +336,16 @@ public class KubeshipService implements MembershipService, MembershipListener, M
 
             String labels = getEnv(ENV_PREFIX + "LABELS");
 
-            url = String.format("%s://%s:%s/api/%s/namespaces/%s/pods",
-                    protocol, host, port, ver,
-                    URLEncoder.encode(labels, "UTF-8"));
+            namespace = URLEncoder.encode(namespace, "UTF-8");
+            labels = labels == null ? null : URLEncoder.encode(labels, "UTF-8");
+
+            url = String.format("%s://%s:%s/api/%s/namespaces/%s/pods", protocol, host, port, ver, namespace);
 
             if (labels != null && labels.length() > 0)
-                url = url + "?labelSelector=" + URLEncoder.encode(labels, "UTF-8");
-
-            labels = getEnv(ENV_PREFIX + "LABELS");
+                url = url + "?labelSelector=" + labels;
         }
 
-        private static String getEnv(String... keys) {
+        private String getEnv(String... keys) {
             String val = null;
 
             for (String key : keys) {
@@ -352,51 +357,114 @@ public class KubeshipService implements MembershipService, MembershipListener, M
             return val;
         }
 
+        private byte[] idToBytes(String id) {
+            if (id == null)
+                return null;
+
+            id = id.replaceAll("-", "");
+            if (id.length() < 32)
+                return null;
+
+            byte[] bytes = new byte[16];
+            for (int i = 0; i < bytes.length; i++)
+                bytes[i] = (byte) Integer.parseInt(id.substring(i * 2, i * 2 + 2), 16);
+
+            return bytes;
+        }
+
         @Override
         public void run() {
-            boolean doRunRefreshThread = true;
-            Map<String, String> headers = new HashMap<>();
 
-            while (doRunRefreshThread) {
-                log.info("Refresh pod list");
-
-                log.info("URL = " + url);
-                JSONObject json = null;
-                try {
-                    // TODO: extract timeout values to KubeshipService.properties
-                    InputStream stream = streamProvider.openStream(url, headers, 1000, 1000);
-                    json = new JSONObject(new JSONTokener(stream));
-                } catch (IOException e) {
-                    // TODO
-                    e.printStackTrace();
-                    return;
-                }
-
-                JSONArray items = json.getJSONArray("items");
-
-                for (int i = 0; i < items.length(); i++) {
-                    JSONObject item = items.getJSONObject(i);
-                    JSONObject status = item.getJSONObject("status");
-
-                    if (status.getString("phase").equals("Running")) {
-                        /* TODO:
-                        - get status.podIP
-                        - get metadata.uid
-                        - transform uid to UniqueId
-                        - compare id with existing members
-                        - call memberAdded for new member
-                        - call memberDisappeared for members not in pod list
-                         */
-
-                        String ip = status.getString("podIP");
-                        log.info("Pod found: " + ip);
-                    }
-                }
+            while (running) {
+                fetchPeers();
 
                 try {
                     // TODO: extract sleep time to KubeshipService.properties
-                    Thread.sleep(5000);
+                    Thread.sleep(10000);
                 } catch (InterruptedException ignore) {
+                }
+            }
+        }
+
+        private void fetchPeers() {
+            log.info("Refresh pod list");
+            Map<String, String> headers = new HashMap<>();
+
+            JSONObject json = null;
+            try {
+                // TODO: extract timeout values to KubeshipService.properties
+                InputStream stream = streamProvider.openStream(url, headers, 1000, 1000);
+                json = new JSONObject(new JSONTokener(stream));
+            } catch (IOException e) {
+                // TODO
+                e.printStackTrace();
+                return;
+            }
+
+            JSONArray items = json.getJSONArray("items");
+            List<MemberImpl> foundMembers = new ArrayList<>();
+
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.getJSONObject(i);
+                JSONObject status = item.getJSONObject("status");
+                JSONObject metadata = item.getJSONObject("metadata");
+
+                if (!status.getString("phase").equals("Running"))
+                    continue;
+
+                // TODO: how to handle current pod?
+
+                String ip = status.getString("podIP");
+                String uid = metadata.getString("uid");
+                byte[] id = idToBytes(uid);
+                if (id == null) {
+                    log.info("UID " + uid + " malformed; ignoring this pod");
+                    continue;
+                }
+
+                MemberImpl member = null;
+                try {
+                    // TODO: read port from properties
+                    member = new MemberImpl(ip, 4000, 0);
+                } catch (IOException e) {
+                    // TODO
+                    e.printStackTrace();
+                    continue;
+                }
+
+                member.setUniqueId(id);
+                foundMembers.add(member);
+
+                // Check if member is already known (i.e. already in membership)
+                boolean isNew = true;
+                for (Member m : getMembers()) {
+                    if (Arrays.equals(m.getUniqueId(), member.getUniqueId())) {
+                        isNew = false;
+                        break;
+                    }
+                }
+
+                if (isNew) {
+                    log.info("New: " + member);
+                    membership.addMember(member);
+                    memberAdded(member);
+                }
+            }
+
+            // Check for dead members (i.e. members in membership but not in fetched members)
+            for (Member member : getMembers()) {
+                boolean isDead = true;
+                for (Member m : foundMembers) {
+                    if (Arrays.equals(m.getUniqueId(), member.getUniqueId())) {
+                        isDead = false;
+                        break;
+                    }
+                }
+
+                if (isDead) {
+                    log.info("Dead: " + member);
+                    membership.removeMember(member);
+                    memberDisappeared(member);
                 }
             }
         }

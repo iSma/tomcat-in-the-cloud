@@ -5,6 +5,6 @@ spec:
       containers:
       - env :
         ports:
-          - name: kubeping
-            containerPort: 8888
+          - name: tomcat-session
+            containerPort: 4000
             protocol: TCP
