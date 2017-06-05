@@ -1,0 +1,6 @@
+metadata:
+  annotations:
+    haproxy.router.openshift.io/disable_cookies: 'true'
+spec:
+  to:
+    name: ${artifactId}
