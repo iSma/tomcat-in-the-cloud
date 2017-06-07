@@ -8,7 +8,8 @@ import org.apache.catalina.tribes.group.GroupChannel;
 import org.apache.catalina.tribes.group.interceptors.MessageDispatchInterceptor;
 import org.apache.catalina.tribes.group.interceptors.TcpFailureDetector;
 import org.apache.catalina.tribes.group.interceptors.TcpPingInterceptor;
-import org.apache.catalina.tribes.membership.McastService;
+import org.example.kubeping.membership.DynamicMembershipService;
+import org.example.kubeping.membership.KubernetesMemberProvider;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +31,7 @@ public class Main {
         ctx.setDistributable(true);
 
         GroupChannel channel = (GroupChannel) cluster.getChannel();
-        channel.setMembershipService(new KubeshipService());
+        channel.setMembershipService(new DynamicMembershipService(new KubernetesMemberProvider()));
 
         channel.addInterceptor(new TcpPingInterceptor());
         channel.addInterceptor(new TcpFailureDetector());

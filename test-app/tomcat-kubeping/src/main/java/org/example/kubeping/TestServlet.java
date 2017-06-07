@@ -14,7 +14,7 @@ public class TestServlet extends HttpServlet {
             "  \"counter\": %d,\n" +
             "  \"id\": \"%s\",\n" +
             "  \"new\": %s,\n" +
-            "  \"server\": \"%s\"\n" +
+            "  \"server\": \"%s\",\n" +
             "  \"hostname\": \"%s\"\n" +
             "}";
 
@@ -22,7 +22,6 @@ public class TestServlet extends HttpServlet {
     public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         response.setContentType("application/json;charset=UTF-8");
 
-        PrintWriter out = response.getWriter();
         HttpSession session = request.getSession();
 
         Integer counter = (Integer) session.getAttribute("counter");
@@ -35,10 +34,8 @@ public class TestServlet extends HttpServlet {
         String server = InetAddress.getLocalHost().getHostAddress();
         String hostname = InetAddress.getLocalHost().getHostName();
 
-        try {
+        try (PrintWriter out = response.getWriter()) {
             out.println(String.format(TEMPLATE, counter, id, isNew, server, hostname));
-        } finally {
-            out.close();
         }
     }
 }
