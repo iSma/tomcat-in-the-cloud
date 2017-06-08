@@ -22,6 +22,11 @@ public class TestServlet extends HttpServlet {
     public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         response.setContentType("application/json;charset=UTF-8");
 
+        if (!request.getServletPath().equals("/")) {
+            response.setStatus(404);
+            return;
+        }
+
         HttpSession session = request.getSession();
 
         Integer counter = (Integer) session.getAttribute("counter");
