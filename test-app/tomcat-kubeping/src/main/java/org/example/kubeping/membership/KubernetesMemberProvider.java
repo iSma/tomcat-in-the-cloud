@@ -22,6 +22,8 @@ import java.security.AccessController;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
 
 public class KubernetesMemberProvider implements MemberProvider {
@@ -29,16 +31,16 @@ public class KubernetesMemberProvider implements MemberProvider {
 
     // TODO: what about "pure" Kubernetes?
     private static final String ENV_PREFIX = "OPENSHIFT_KUBE_PING_";
-
     private String url;
     private StreamProvider streamProvider;
     private int connectionTimeout;
     private int readTimeout;
 
+    private LocalDateTime startTime;
+    private MessageDigest md5;
+
     private int port;
     private String hostName;
-
-    private MessageDigest md5;
 
     public KubernetesMemberProvider() {
         try {
@@ -63,6 +65,8 @@ public class KubernetesMemberProvider implements MemberProvider {
 
     @Override
     public void init(Properties properties) throws IOException {
+        startTime = LocalDateTime.now();
+
         connectionTimeout = Integer.parseInt(properties.getProperty("connectionTimeout", "1000"));
         readTimeout = Integer.parseInt(properties.getProperty("readTimeout", "1000"));
 
@@ -101,6 +105,9 @@ public class KubernetesMemberProvider implements MemberProvider {
 
             streamProvider = new TokenStreamProvider(saToken, caCertFile);
         } else {
+            // TODO: implement CertificateStreamProvider
+            throw new NotImplementedException();
+            /*
             if (protocol == null)
                 protocol = "http";
 
@@ -117,9 +124,8 @@ public class KubernetesMemberProvider implements MemberProvider {
             String caCertFile = getEnv(ENV_PREFIX + "CA_CERT_FILE", "KUBERNETES_CA_CERTIFICATE_FILE");
             if (caCertFile == null)
                 caCertFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+            */
 
-            // TODO
-            throw new NotImplementedException();
             // CertificateStreamProvider isn't implemented yet
             // streamProvider = new CertificateStreamProvider(certFile, keyFile, keyPassword, keyAlgo, caCertFile);
         }
@@ -152,6 +158,7 @@ public class KubernetesMemberProvider implements MemberProvider {
             String phase;
             String ip;
             String name;
+            LocalDateTime creationTime;
 
             try {
                 JSONObject item = items.getJSONObject(i);
@@ -160,6 +167,8 @@ public class KubernetesMemberProvider implements MemberProvider {
                 phase = status.getString("phase");
                 ip = status.getString("podIP");
                 name = metadata.getString("name");
+                String timestamp = metadata.getString("creationTimestamp");
+                creationTime = LocalDateTime.parse(timestamp);
             } catch (JSONException e) {
                 log.warn("JSON Exception: ", e);
                 continue;
@@ -168,17 +177,16 @@ public class KubernetesMemberProvider implements MemberProvider {
             if (!phase.equals("Running"))
                 continue;
 
-            // TODO: how to handle current pod?
-
             // We found ourselves, ignore
             if (name.equals(hostName))
                 continue;
 
             byte[] id = md5.digest(name.getBytes());
+            long aliveTime = Duration.between(startTime, creationTime).getSeconds() * 1000;
 
             MemberImpl member = null;
             try {
-                member = new MemberImpl(ip, port, 0);
+                member = new MemberImpl(ip, port, aliveTime);
             } catch (IOException e) {
                 // TODO
                 log.warn("Exception: ", e);
