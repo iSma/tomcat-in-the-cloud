@@ -3,11 +3,13 @@ package org.example.kubeping.membership;
 import org.apache.catalina.tribes.*;
 import org.apache.catalina.tribes.membership.Membership;
 import org.apache.catalina.tribes.membership.StaticMember;
-import org.apache.catalina.tribes.util.UUIDGenerator;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -56,20 +58,19 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
             return;
 
         // TODO: check that all required properties are set
-        // TODO: check that memberProvider is set
 
         log.info("start(" + level + ")");
+
+        if (membership == null)
+            membership = new Membership(localMember);
+        else
+            membership.reset();
 
         createOrUpdateLocalMember();
         localMember.setMemberAliveTime(100);
         localMember.setPayload(payload);
         localMember.setDomain(domain);
         localMember.setServiceStartTime(System.currentTimeMillis());
-
-        if (membership == null)
-            membership = new Membership(localMember);
-        else
-            membership.reset();
 
         memberProvider.init(properties);
         fetchMembers(); // Fetch members synchronously once before starting thread
@@ -171,6 +172,9 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
         log.info("getLocalMember: " + incAliveTime);
         if (incAliveTime && localMember != null)
             localMember.setMemberAliveTime(System.currentTimeMillis() - localMember.getServiceStartTime());
+
+        if (localMember != null)
+            log.info("aliveTime: " + localMember.getMemberAliveTime());
         return localMember;
     }
 
@@ -215,7 +219,16 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
 
         if (localMember == null) {
             localMember = new StaticMember(host, port, 0);
-            localMember.setUniqueId(UUIDGenerator.randomUUID(true));
+            try {
+                // Set localMember unique ID to md5 hash of hostname
+                localMember.setUniqueId(MessageDigest
+                        .getInstance("md5")
+                        .digest(InetAddress
+                                .getLocalHost().getHostName().getBytes()));
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+
             localMember.setLocal(true);
         } else {
             localMember.setHostname(host);

@@ -14,10 +14,13 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.URLEncoder;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.security.AccessController;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.util.*;
 
@@ -31,7 +34,20 @@ public class KubernetesMemberProvider implements MemberProvider {
     private StreamProvider streamProvider;
     private int connectionTimeout;
     private int readTimeout;
+
     private int port;
+    private String hostName;
+
+    private MessageDigest md5;
+
+    public KubernetesMemberProvider() {
+        try {
+            md5 = MessageDigest.getInstance("md5");
+        } catch (NoSuchAlgorithmException e) {
+            // Shouldn't happen
+            e.printStackTrace();
+        }
+    }
 
     private static String getEnv(String... keys) {
         String val = null;
@@ -45,27 +61,15 @@ public class KubernetesMemberProvider implements MemberProvider {
         return val;
     }
 
-    private static byte[] idToBytes(String id) {
-        if (id == null)
-            return null;
-
-        id = id.replaceAll("-", "");
-        if (id.length() < 32)
-            return null;
-
-        byte[] bytes = new byte[16];
-        for (int i = 0; i < bytes.length; i++)
-            bytes[i] = (byte) Integer.parseInt(id.substring(i * 2, i * 2 + 2), 16);
-
-        return bytes;
-    }
-
     @Override
     public void init(Properties properties) throws IOException {
         connectionTimeout = Integer.parseInt(properties.getProperty("connectionTimeout", "1000"));
         readTimeout = Integer.parseInt(properties.getProperty("readTimeout", "1000"));
+
+        hostName = InetAddress.getLocalHost().getHostName();
         port = Integer.parseInt(properties.getProperty("tcpListenPort"));
 
+        // Set up Kubernetes API parameters
         String namespace = getEnv(ENV_PREFIX + "NAMESPACE");
         if (namespace == null || namespace.length() == 0)
             throw new RuntimeException("Namespace not set; clustering disabled");
@@ -147,7 +151,7 @@ public class KubernetesMemberProvider implements MemberProvider {
         for (int i = 0; i < items.length(); i++) {
             String phase;
             String ip;
-            String uid;
+            String name;
 
             try {
                 JSONObject item = items.getJSONObject(i);
@@ -155,7 +159,7 @@ public class KubernetesMemberProvider implements MemberProvider {
                 JSONObject metadata = item.getJSONObject("metadata");
                 phase = status.getString("phase");
                 ip = status.getString("podIP");
-                uid = metadata.getString("uid");
+                name = metadata.getString("name");
             } catch (JSONException e) {
                 log.warn("JSON Exception: ", e);
                 continue;
@@ -166,11 +170,11 @@ public class KubernetesMemberProvider implements MemberProvider {
 
             // TODO: how to handle current pod?
 
-            byte[] id = idToBytes(uid);
-            if (id == null) {
-                log.info("UID " + uid + " malformed; ignoring this pod");
+            // We found ourselves, ignore
+            if (name.equals(hostName))
                 continue;
-            }
+
+            byte[] id = md5.digest(name.getBytes());
 
             MemberImpl member = null;
             try {
