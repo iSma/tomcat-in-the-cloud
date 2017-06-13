@@ -112,38 +112,19 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
             return;
         }
 
-        // Check for new members (i.e. not already in membership)
+        // Add new members & refresh lastHeardFrom timestamp for already known members
         for (Member member : members) {
-            boolean isNew = true;
-            for (Member m : getMembers()) {
-                if (Arrays.equals(m.getUniqueId(), member.getUniqueId())) {
-                    isNew = false;
-                    break;
-                }
-            }
-
-            if (isNew) {
+            if (membership.memberAlive(member)) {
                 log.info("New member: " + member);
-                membership.addMember(member);
                 memberAdded(member);
             }
         }
 
-        // Check for dead members (i.e. members in membership but not in fetched members)
-        for (Member member : getMembers()) {
-            boolean isDead = true;
-            for (Member m : members) {
-                if (Arrays.equals(m.getUniqueId(), member.getUniqueId())) {
-                    isDead = false;
-                    break;
-                }
-            }
-
-            if (isDead) {
-                log.info("Member is dead: " + member);
-                membership.removeMember(member);
-                memberDisappeared(member);
-            }
+        // Delete old members, i.e. those that weren't refreshed in the last update
+        Member[] expired = membership.expire(100); // TODO: is 100ms a good value?
+        for (Member member : expired) {
+            log.info("Member is dead: " + member);
+            memberDisappeared(member);
         }
     }
 
