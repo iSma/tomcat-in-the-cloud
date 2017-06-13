@@ -23,7 +23,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class KubernetesMemberProvider implements MemberProvider {
@@ -36,7 +38,7 @@ public class KubernetesMemberProvider implements MemberProvider {
     private int connectionTimeout;
     private int readTimeout;
 
-    private LocalDateTime startTime;
+    private Instant startTime;
     private MessageDigest md5;
 
     private int port;
@@ -65,7 +67,7 @@ public class KubernetesMemberProvider implements MemberProvider {
 
     @Override
     public void init(Properties properties) throws IOException {
-        startTime = LocalDateTime.now();
+        startTime = Instant.now();
 
         connectionTimeout = Integer.parseInt(properties.getProperty("connectionTimeout", "1000"));
         readTimeout = Integer.parseInt(properties.getProperty("readTimeout", "1000"));
@@ -158,7 +160,7 @@ public class KubernetesMemberProvider implements MemberProvider {
             String phase;
             String ip;
             String name;
-            LocalDateTime creationTime;
+            Instant creationTime;
 
             try {
                 JSONObject item = items.getJSONObject(i);
@@ -168,7 +170,7 @@ public class KubernetesMemberProvider implements MemberProvider {
                 ip = status.getString("podIP");
                 name = metadata.getString("name");
                 String timestamp = metadata.getString("creationTimestamp");
-                creationTime = LocalDateTime.parse(timestamp);
+                creationTime = Instant.parse(timestamp);
             } catch (JSONException e) {
                 log.warn("JSON Exception: ", e);
                 continue;
@@ -182,7 +184,7 @@ public class KubernetesMemberProvider implements MemberProvider {
                 continue;
 
             byte[] id = md5.digest(name.getBytes());
-            long aliveTime = Duration.between(startTime, creationTime).getSeconds() * 1000;
+            long aliveTime = Duration.between(creationTime, startTime).getSeconds() * 1000;
 
             MemberImpl member = null;
             try {
