@@ -3,9 +3,9 @@
 ## Usage
 
 Log into the OpenShift console and switch to this app's project
-(by default: `tomcat-in-the-cloud`, can be customized thorugh `fabric8.namespace` in `pom.xml`).
+(by default: `tomcat-in-the-cloud`, can be customized through `fabric8.namespace` in `pom.xml`).
 
-Add a service account for KubePing:
+Add a service account for the Openshift API:
 
 ```sh
 oc policy add-role-to-user view system:serviceaccount:$(oc project -q):default -n $(oc project -q)

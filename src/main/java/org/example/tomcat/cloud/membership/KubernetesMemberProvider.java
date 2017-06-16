@@ -42,6 +42,8 @@ public class KubernetesMemberProvider implements MemberProvider {
     private Instant startTime;
     private MessageDigest md5;
 
+    private Map<String, String> headers = new HashMap<>();
+
     private int port;
     private String hostName;
 
@@ -109,6 +111,10 @@ public class KubernetesMemberProvider implements MemberProvider {
             if (caCertFile == null)
                 caCertFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
+            // Preemptively add authorization token in headers
+            // (TokenStreamProvider does it too, but too late)
+            headers.clear();
+            headers.put("Authorization", "Bearer " + saToken);
             streamProvider = new TokenStreamProvider(saToken, caCertFile);
         } else {
             // TODO: implement CertificateStreamProvider
@@ -152,7 +158,7 @@ public class KubernetesMemberProvider implements MemberProvider {
 
     @Override
     public List<? extends Member> getMembers() throws Exception {
-        Map<String, String> headers = new HashMap<>();
+
         List<MemberImpl> members = new ArrayList<>();
 
         InputStream stream = streamProvider.openStream(url, headers, connectionTimeout, readTimeout);
