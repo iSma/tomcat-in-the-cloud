@@ -1,4 +1,4 @@
-package org.example.kubeping.stream;
+package org.example.tomcat.cloud.stream;
 
 import java.io.*;
 import java.net.URLConnection;

@@ -1,11 +1,11 @@
-package org.example.kubeping.membership;
+package org.example.tomcat.cloud.membership;
 
 import org.apache.catalina.tribes.Member;
 import org.apache.catalina.tribes.membership.MemberImpl;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.example.kubeping.stream.StreamProvider;
-import org.example.kubeping.stream.TokenStreamProvider;
+import org.example.tomcat.cloud.stream.StreamProvider;
+import org.example.tomcat.cloud.stream.TokenStreamProvider;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -24,8 +24,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivilegedAction;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class KubernetesMemberProvider implements MemberProvider {

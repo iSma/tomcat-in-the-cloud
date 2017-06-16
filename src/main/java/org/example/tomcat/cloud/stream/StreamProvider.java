@@ -14,7 +14,7 @@
  *  permissions and limitations under the License.
  */
 
-package org.example.kubeping.stream;
+package org.example.tomcat.cloud.stream;
 
 import java.io.IOException;
 import java.io.InputStream;

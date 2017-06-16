@@ -1,4 +1,4 @@
-package org.example.kubeping;
+package org.example.tomcat.cloud;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;

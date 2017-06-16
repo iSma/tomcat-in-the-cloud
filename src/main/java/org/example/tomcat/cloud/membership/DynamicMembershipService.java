@@ -1,4 +1,4 @@
-package org.example.kubeping.membership;
+package org.example.tomcat.cloud.membership;
 
 import org.apache.catalina.tribes.*;
 import org.apache.catalina.tribes.membership.Membership;

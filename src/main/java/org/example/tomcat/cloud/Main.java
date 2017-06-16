@@ -1,4 +1,4 @@
-package org.example.kubeping;
+package org.example.tomcat.cloud;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleException;
@@ -10,8 +10,8 @@ import org.apache.catalina.tribes.group.interceptors.TcpFailureDetector;
 import org.apache.catalina.tribes.group.interceptors.TcpPingInterceptor;
 import org.apache.juli.logging.Log;
 import org.apache.juli.logging.LogFactory;
-import org.example.kubeping.membership.DynamicMembershipService;
-import org.example.kubeping.membership.KubernetesMemberProvider;
+import org.example.tomcat.cloud.membership.DynamicMembershipService;
+import org.example.tomcat.cloud.membership.KubernetesMemberProvider;
 
 import java.io.File;
 import java.io.IOException;
