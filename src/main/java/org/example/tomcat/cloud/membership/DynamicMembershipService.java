@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -224,17 +223,14 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
     @Override
     public void setMembershipListener(MembershipListener listener) {
         this.listener = listener;
-        log.info("setMembershipListener: " + listener);
     }
 
     @Override
     public void removeMembershipListener() {
         this.listener = null;
-        log.info("removeMembershipListener");
     }
 
     public void setMessageListener(MessageListener listener) {
-        log.info("setMessageListener: " + listener);
         this.messageListener = listener;
     }
 
@@ -245,29 +241,24 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
     @Override
     public void setPayload(byte[] payload) {
         // TODO: what does this method do?
-        log.info("setPayload: " + Arrays.toString(payload));
         this.payload = payload;
         if (localMember != null) {
             localMember.setPayload(payload);
-            // impl.send(false)
         }
     }
 
     @Override
     public void setDomain(byte[] domain) {
         // TODO: what does this method do?
-        log.info("setDomain: " + Arrays.toString(domain));
         this.domain = domain;
         if (localMember != null) {
             localMember.setDomain(domain);
-            // impl.send(false)
         }
     }
 
     @Override
     public void broadcast(ChannelMessage message) throws ChannelException {
         // TODO: what does this method do?
-        log.info("broadcast: " + message);
     }
 
     @Override
@@ -277,7 +268,6 @@ public class DynamicMembershipService implements MembershipService, MembershipLi
 
     @Override
     public void setChannel(Channel channel) {
-        log.info("setChannel: " + channel);
         this.channel = channel;
     }
 

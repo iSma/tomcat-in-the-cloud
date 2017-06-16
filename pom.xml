@@ -17,6 +17,7 @@
         <json.version>20170516</json.version>
 
         <!-- OpenShift service customization -->
+        <port>8080</port>
         <fabric8.namespace>tomcat-in-the-cloud</fabric8.namespace>
 
         <!-- Readiness Probe -->
@@ -102,7 +103,7 @@
                             <java-exec>
                                 <jolokiaPort>0</jolokiaPort>
                                 <prometheusPort>0</prometheusPort>
-                                <webPort>8080</webPort>
+                                <webPort>${port}</webPort>
                             </java-exec>
                         </config>
                     </generator>
@@ -112,15 +113,6 @@
                             <OPENSHIFT_KUBE_PING_NAMESPACE>${fabric8.namespace}</OPENSHIFT_KUBE_PING_NAMESPACE>
                         </env>
                     </resources>
-
-                    <enricher>
-                        <config>
-                            <fmp-service>
-                                <name>${project.artifactId}</name>
-                                <port>8080</port>
-                            </fmp-service>
-                        </config>
-                    </enricher>
                 </configuration>
             </plugin>
 

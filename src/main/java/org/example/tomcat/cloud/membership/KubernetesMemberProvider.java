@@ -31,11 +31,14 @@ public class KubernetesMemberProvider implements MemberProvider {
 
     // TODO: what about "pure" Kubernetes?
     private static final String ENV_PREFIX = "OPENSHIFT_KUBE_PING_";
+
+    // Kubernetes API URL, constructed from environment variables in init()
     private String url;
     private StreamProvider streamProvider;
     private int connectionTimeout;
     private int readTimeout;
 
+    // Start time of this instance, used to compute aliveTime of peers
     private Instant startTime;
     private MessageDigest md5;
 
@@ -51,6 +54,9 @@ public class KubernetesMemberProvider implements MemberProvider {
         }
     }
 
+    // Get value of environment variable named keys[0]
+    // If keys[0] isn't found, try keys[1], keys[2], ...
+    // If nothing is found, return null
     private static String getEnv(String... keys) {
         String val = null;
 
@@ -163,9 +169,16 @@ public class KubernetesMemberProvider implements MemberProvider {
             try {
                 JSONObject item = items.getJSONObject(i);
                 JSONObject status = item.getJSONObject("status");
-                JSONObject metadata = item.getJSONObject("metadata");
                 phase = status.getString("phase");
+
+                // Ignore shutdown pods
+                if (!phase.equals("Running"))
+                    continue;
+
                 ip = status.getString("podIP");
+
+                // Get name & start time
+                JSONObject metadata = item.getJSONObject("metadata");
                 name = metadata.getString("name");
                 String timestamp = metadata.getString("creationTimestamp");
                 creationTime = Instant.parse(timestamp);
@@ -174,21 +187,20 @@ public class KubernetesMemberProvider implements MemberProvider {
                 continue;
             }
 
-            if (!phase.equals("Running"))
-                continue;
-
             // We found ourselves, ignore
             if (name.equals(hostName))
                 continue;
 
+            // id = md5(hostname)
             byte[] id = md5.digest(name.getBytes());
-            long aliveTime = Duration.between(creationTime, startTime).getSeconds() * 1000;
+            long aliveTime = Duration.between(creationTime, startTime).getSeconds() * 1000; // aliveTime is in ms
 
             MemberImpl member = null;
             try {
                 member = new MemberImpl(ip, port, aliveTime);
             } catch (IOException e) {
-                // TODO
+                // Shouldn't happen:
+                // an exception is thrown if hostname can't be resolved to IP, but we already provide an IP
                 log.warn("Exception: ", e);
                 continue;
             }

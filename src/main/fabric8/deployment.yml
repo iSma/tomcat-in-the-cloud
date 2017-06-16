@@ -1,10 +1,2 @@
 spec:
   replicas: 2
-  template:
-    spec:
-      containers:
-      - env :
-        ports:
-          - name: tomcat-session
-            containerPort: 4000
-            protocol: TCP
