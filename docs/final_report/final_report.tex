@@ -91,34 +91,20 @@ This project was realized for the \emph{R\&D Workshop} at the University of Neuc
 
 Until now, session replication in Tomcat was not cloud ready. The principal implementation uses multicast which only works in a local network, whereas in a cloud deployment, instances can be distributed over the internet. This report describes the solution we've developed over the course of this semester.
 
-\subsection{Goal}
-
-The major goal of the project to make Tomcat's session work in the cloud. This
-goal is divided in 3 steps:
-\begin{enumerate}
-    \item Study existing methods
-    \item Implement a new solution based on one of those methods
-    \item Test the implementation
-\end{enumerate}
-
-Another important goal is to provide detailed documentation for future users.
-We will write a ``Quick Start Guide'' detailing the steps to follow to have a
-working Tomcat cluster running in an OpenShift cloud.
-
 % ================================ %
 
 \section{Organization}
 
 All our work is available on a GitHub repository\footnote{\url{https://github.com/iSma/tomcat-in-the-cloud/}}. The branch \emph{master} contains our solution: the source code of the application and a \emph{README} file (reproduced in appendix~\ref{sec:usage}) containing all information necessary to configure and deploy our application. It also contains the documentation we produced during the project in the \emph{docs} folder. The logbook of the project is accessible in the \emph{Wiki} section.
 
-The repository has another branch called \emph{experiments}\footnote{\url{https://github.com/iSma/tomcat-in-the-cloud/tree/experiments}} that contains all the test applications and experiments we produced to get familiar with the new technologies. For each application there is a small \emph{README} file that gives basics instructions for their deployment.
+The repository has another branch called \emph{experiments}\footnote{\url{https://github.com/iSma/tomcat-in-the-cloud/tree/experiments}} that contains all the test applications and experiments we produced to get familiar with the new technologies. For each application there is a small \emph{README} file that gives basic instructions for their deployment.
 
 
 % ================================ %
 
 \section{State of the art}
 
-During the initial research phase of the project, we looked for existing solutions to this problem, as well as partial solutions we could build on. We've identified 3 such paths to explore:
+During the initial research phase of the project, we looked for existing solutions to this problem, as well as partial solutions we could build on. We have identified 3 such paths to explore:
 
 \begin{enumerate}
 \item \texttt{DeltaManager}: With this built-in session manager, session data is replicated among all nodes. When using this mechanism, other nodes are discovered through multicast ping messages, or a static list of peers can be provided.
@@ -128,29 +114,29 @@ During the initial research phase of the project, we looked for existing solutio
 \item External session management solutions: when using the \emph{Spring Framework}\autocite{spring} for instance, Tomcat's session management is bypassed and sessions are handled directly by the framework. Spring is advertised to have built-in support for data stores such as  \emph{Redis} or \emph{Hazelcast}\footnote{\url{http://docs.spring.io/spring-session/docs/current/reference/html5/}}.
 \end{enumerate}
 
-Solution 1 is the most attractive for the end-user, as it doesn't involve installing and running a database server, nor additional software dependencies. This is why we decided to concentrate our efforts on building a solution on top of \texttt{DeltaManager}. The main difficulty was implementing an alternative discovery process.
+Solution 1 is the most attractive for end-users, as it doesn't involve installing and running a database server, nor additional software dependencies. This is why we decided to concentrate our efforts on building a solution on top of \texttt{DeltaManager}. The main difficulty was implementing an alternative discovery process.
 
 \section{Our solution}
 
 The final solution we provide uses the built-in \texttt{DeltaManager}, but replaces the default peer discovery mechanism. Tomcat can be configured to use any class implementing the interface \texttt{MembershipService} for peer discovery. Only one such implementation is provided, \texttt{McastService}, which works by sending heartbeat messages over multicast.
 
-We created a new implementation, \texttt{DynamicMembershipService}, which handles bookkeeping of peers and informing listeners of added and removed members. The discovery per se is delegated to a \texttt{MemberProvider}. The \texttt{DynamicMembershipService} starts a \texttt{RefreshThread}, which periodically asks the \texttt{MemberProvider} for new peers. The class hierarchy is shown in figure~\ref{fig:classes}, and a detailed sequence diagram is shown in figure~\ref{fig:seq}.
+We created a new implementation, \texttt{DynamicMembershipService}, which handles bookkeeping of peers and informing listeners of added and removed members. The discovery per se is delegated to a \texttt{MemberProvider}. The \texttt{DynamicMembershipService} starts a \texttt{RefreshThread}, which periodically asks the \texttt{MemberProvider} for new peers. The class hierarchy is shown in Figure~\ref{fig:classes}, and a detailed sequence diagram is shown in Figure~\ref{fig:seq}.
 
 We provide one implementation of \texttt{MemberProvider}: \texttt{KubernetesMemberProvider}. Its operation is largely inspired by the \emph{KubePing} project\autocite{kubeping}, a Kubernetes discovery protocol for \emph{JGroups}. The code available in the \texttt{stream} package was reproduced from this project.
 
 \texttt{KubernetesMemberProvider} is based on the OpenShift REST API\autocite{openshift-api}, which is available to all pods\footnote{In OpenShift/Kubernetes, an instance is called ``pod''}. We use it to get a list of all running pods. All pods automatically get injected with environment variables and files allowing them to authenticate themselves and construct the URL to access this API (see file \emph{KubernetesMemberProvider.java} for more detail).
 
-Accessing the path \texttt{/api/v1/namespaces/tomcat-in-the-cloud/pods} returns a JSON representation of all the pods in the deployment. An excerpt of a typical response can be found in Listing~\ref{lst:api}. This response is then parsed, and only the running pods are kept, from which we extract following data:
+Accessing the path \texttt{/api/v1/namespaces/tomcat-in-the-cloud/pods} returns a JSON representation of all the pods in the deployment. An excerpt of a typical response can be found in Listing~\ref{lst:api}. This response is then parsed, and only the running pods are kept, from which we extract the following data:
 
 \begin{itemize}
   \item \texttt{status.podIP}: The IP address of the peer
-  \item \texttt{metadata.name}: Its host name, is md5-hashed and use as unique ID
+  \item \texttt{metadata.name}: Its host name, is md5-hashed and uses as unique ID
   \item \texttt{metadata.creationTimestamp}: Creation time of the node
 \end{itemize}
 
 The creation time is used to compute how long the peer has been alive (relatively to the current node). This value is used internally by Tomcat: upon startup, the initial exchange of session data is made with the oldest peer.
 
-\begin{lstlisting}[caption=Pod list returned by the API (excerpt),label=lst:api,float,floatplacement=H]
+\begin{lstlisting}[caption=Pod list returned by the API (excerpt),label=lst:api]
 {
   "kind": "PodList",
   "apiVersion": "v1",
@@ -291,7 +277,7 @@ By making multiple requests and checking if the counter is incremented, we can v
 
 \texttt{oc scale dc tomcat-in-the-cloud --replicas=\$N}
 
-Where \texttt{\$N} is the desired number of instances. This allowed to verify that our solution was robust to churn (members joining and leaving the cluster).
+where \texttt{\$N} is the desired number of instances. This allowed to verify that our solution was robust to churn (members joining and leaving the cluster).
 
 The solution was tested successfully in two different OpenShift deployments:
 \begin{itemize}
@@ -314,7 +300,7 @@ Although the solution is working as expected, some minor issues still exist.
 
 \item Although the class is named \texttt{KubernetesMemberProvider}, it might not work in non-OpenShift Kubernetes installations, since the environment variables used to set up API calls might be different. Testing in such environments is required.
 
-\item Multiple applications deployed to the same namespace/project will form a single cluster and share session data together, which adds some overhead (due to more data being shared) and can pose security risks. A solution to this could be possible with labels: \texttt{KubernetesMemberProvider} already filters pods by label if the environment variable \texttt{OPENSHIFT\_KUBE\_PING\_LABELS} is set (can be set in the file \emph{pom.xml}, similarly to \texttt{OPENSHIFT\_KUBE\_PING\_LABELS}), and labels can be added the application by fabric8\footnote{\url{https://maven.fabric8.io/\#resource-labels-annotations}}
+\item Multiple applications deployed to the same namespace/project will form a single cluster and share session data together, which adds some overhead (due to more data being shared) and can pose security risks. A solution to this could be possible with labels: \texttt{KubernetesMemberProvider} already filters pods by label if the environment variable \texttt{OPENSHIFT\_KUBE\_PING\_LABELS} is set (can be set in the file \emph{pom.xml}, similarly to \texttt{OPENSHIFT\_KUBE\_PING\_LABELS}), and labels can be added to the application by fabric8\footnote{\url{https://maven.fabric8.io/\#resource-labels-annotations}}.
 
 \item Our testing method consisted of manually making requests and verifying that the counter was correctly incremented and that all the nodes were hit at least once. Instead, a script could be written to perform this task automatically. This script could even be extended to automatically scale the number of pods. Such a setup would help iterating faster.
 
@@ -351,7 +337,7 @@ By default, the application is deployed to the project \emph{tomcat-in-the-cloud
 
 \subsubsection*{Server port}
 
-Tomcat is set to listen to port 8080, and fabric8 must expose this port in the resulting containers. This value is specified in two places: in the application itself (see \emph{Main.java}), and in fabric8's configuration (variable \texttt{port} in \emph{pom.xml})
+Tomcat is set to listen to port 8080, and fabric8 must expose this port in the resulting containers. This value is specified in two places: in the application itself (see \emph{Main.java}), and in fabric8's configuration (variable \texttt{port} in \emph{pom.xml}).
 
 \subsubsection*{Number of replicas}
 
